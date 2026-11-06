@@ -38,6 +38,10 @@
   .drop.on{border-color:var(--brand2);background:#eef3fa}
   .drop strong{display:block;font-size:15px}
   .drop small{color:var(--sub)}
+  .drop .pick{display:inline-block;margin-top:10px;padding:7px 14px;border-radius:8px;background:var(--brand);color:#fff;font-size:13px;font-weight:700}
+  .drop{display:block}
+  .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  #file:focus-visible + .drop{outline:2px solid var(--brand2);outline-offset:2px}
   .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:12px}
   .th{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#eee;aspect-ratio:3/4}
   .th img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
@@ -122,11 +126,12 @@
     </div>
 
     <label class="lab">이미지 업로드 <span class="hint">여러 장 가능 · 긴 상세페이지는 자동으로 나눠서 분석</span></label>
-    <div class="drop" id="drop" tabindex="0">
+    <input type="file" id="file" class="vh" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp" multiple>
+    <label class="drop" id="drop" for="file">
       <strong>이미지를 끌어다 놓거나 클릭해서 선택</strong>
       <small>JPG·PNG·WEBP · 캡처 후 Ctrl+V 붙여넣기도 됩니다</small>
-    </div>
-    <input type="file" id="file" accept="image/*" multiple hidden>
+      <span class="pick">📁 파일 선택</span>
+    </label>
     <div class="thumbs" id="thumbs"></div>
     <div class="meta" id="imgMeta"></div>
 
@@ -224,8 +229,6 @@
 
   // ---------- image intake ----------
   const drop = $("#drop"), file = $("#file");
-  drop.addEventListener('click', () => file.click());
-  drop.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') file.click(); });
   file.addEventListener('change', e => { addFiles([...e.target.files]); file.value=''; });
   ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
   ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
@@ -245,7 +248,12 @@
   function toBlob(canvas){ return new Promise(r => canvas.toBlob(b => r(b), 'image/jpeg', 0.8)); }
 
   async function addFiles(files){
-    files = files.filter(f => f && f.type && f.type.startsWith('image/'));
+    const IMG_EXT = /\.(jpe?g|png|webp|gif|bmp)$/i;
+    const all = files.filter(Boolean);
+    files = all.filter(f => (f.type && f.type.startsWith('image/')) || IMG_EXT.test(f.name || ''));
+    const rejected = all.length - files.length;
+    if (rejected) showErr(`이미지가 아닌 파일 ${rejected}개는 제외했어요. JPG·PNG·WEBP 파일을 올려 주세요. (아이폰 HEIC 사진은 JPG로 바꿔서 올려 주세요)`);
+    else $("#err").style.display = 'none';
     if (!files.length) return;
     $("#status").textContent = '이미지 준비 중…';
     for (const f of files){
