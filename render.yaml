@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cosmetic-ad-checker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      # Render 대시보드에서 직접 입력합니다 (코드에 키를 넣지 않습니다).
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: RATE_LIMIT_PER_HOUR
+        value: "30"
