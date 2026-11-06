@@ -211,6 +211,7 @@
   let srcCount = 0;
   let lastResult = null;
   let busy = false;
+  let preparing = 0;
 
   // ---------- UI basics ----------
   document.querySelectorAll('input[name=ptype]').forEach(r => r.addEventListener('change', () => {
@@ -255,7 +256,10 @@
     if (rejected) showErr(`이미지가 아닌 파일 ${rejected}개는 제외했어요. JPG·PNG·WEBP 파일을 올려 주세요. (아이폰 HEIC 사진은 JPG로 바꿔서 올려 주세요)`);
     else $("#err").style.display = 'none';
     if (!files.length) return;
-    $("#status").textContent = '이미지 준비 중…';
+    preparing++;
+    $("#run").disabled = true; $("#run").textContent = '이미지 준비 중…';
+    $("#status").textContent = `이미지 준비 중… (0/${files.length})`;
+    let doneCount = 0;
     for (const f of files){
       try{
         const {im, url} = await loadImg(f);
@@ -275,8 +279,15 @@
         }
         URL.revokeObjectURL(url);
       }catch(err){ showErr(err.message); }
+      doneCount++;
+      $("#status").textContent = `이미지 준비 중… (${doneCount}/${files.length})`;
+      renderThumbs();
     }
-    $("#status").textContent = '';
+    preparing--;
+    if (!preparing){
+      $("#status").textContent = '';
+      if (!busy){ $("#run").disabled = false; $("#run").textContent = '리스크 검토 시작'; }
+    }
     renderThumbs();
   }
 
@@ -316,6 +327,7 @@
   const STAGES = ['서버 연결 중','이미지 속 문구 읽는 중','식약처 기준과 대조하는 중','수정 문구 작성 중','결과 정리 중'];
   async function run(){
     if (busy) return;
+    if (preparing){ toast('이미지 준비가 끝나면 눌러 주세요'); return; }
     $("#err").style.display='none';
     const copy = $("#copy").value.trim();
     if (!slices.length && !copy){ showErr('이미지를 올리거나 광고 문구를 붙여넣어 주세요.'); return; }
