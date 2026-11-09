@@ -38,7 +38,7 @@
   <table>
     <thead><tr><th>ID</th><th>시기</th><th>업체 · 품목</th><th>위반 유형</th><th>처분</th><th>공개 문구 · 참고</th></tr></thead>
     <tbody id="rows">
-    {% for c in cases|reverse %}
+    {% for c in cases|sort(attribute="date", reverse=True) %}
       <tr data-types="{{ c.types|join(',') }}">
         <td>{{ c.id }}</td>
         <td class="m">{{ c.date }}</td>

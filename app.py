@@ -40,7 +40,7 @@ def _attach_cases(result: dict) -> dict:
         ids = f.get("similar_cases") or []
         if not isinstance(ids, list):
             ids = [ids]
-        briefs = [b for b in (case_brief(i) for i in ids[:5]) if b][:2]
+        briefs = [b for b in (case_brief(i) for i in ids[:5]) if b and not b["product"].startswith("(")][:2]
         f["similar_cases"] = briefs
     return result
 
