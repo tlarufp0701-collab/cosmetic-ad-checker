@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>화장품 광고 행정처분 사례집</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#f6f5f2;color:#1d1d1f;font-family:'Noto Sans KR',system-ui,sans-serif;line-height:1.55}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 18px 60px}
+  h1{font-size:24px;font-weight:900;margin:0 0 6px}
+  p.sub{color:#6b6b70;font-size:14px;margin:0 0 16px}
+  a.back{font-size:13.5px;color:#2d5486;text-decoration:none}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .bar input{flex:1;min-width:200px;border:1px solid #e6e4df;border-radius:10px;padding:9px 12px;font:inherit;font-size:14px}
+  .bar button{border:1px solid #e6e4df;background:#fff;border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer}
+  .bar button.on{background:#1d1d1f;color:#fff;border-color:#1d1d1f}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e4df;border-radius:12px;overflow:hidden;font-size:13.5px}
+  th,td{padding:9px 10px;border-bottom:1px solid #eeece7;text-align:left;vertical-align:top}
+  th{background:#fafaf7;font-weight:700;font-size:12.5px;color:#555;white-space:nowrap}
+  td.m{white-space:nowrap;font-weight:700}
+  .t{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:6px;margin:1px 2px 1px 0;background:#f0efeb}
+  .t.의약품{background:#fdecec;color:#d93a3a}.t.기능성{background:#f3e8fd;color:#7b3fc4}.t.소비자{background:#fff4e0;color:#b56b00}
+  .ph{color:#9b1c1c;font-weight:500}.hint{color:#6b6b70;font-size:12.5px}
+  .note{font-size:12.5px;color:#6b6b70;margin-top:14px}
+  @media(max-width:700px){th:nth-child(1),td:nth-child(1){display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← 검토기로 돌아가기</a>
+  <h1>화장품 광고 행정처분 사례집</h1>
+  <p class="sub">검토기가 '예상 처분'과 '유사 사례'를 판단할 때 참고하는 식약처 처분 사례 {{ cases|length }}건입니다.</p>
+  <div class="bar">
+    <input id="q" placeholder="업체·품목·문구 검색 (예: 엑소좀, 페미닌, 샷)">
+    <button data-t="" class="on">전체</button><button data-t="의약품 오인">의약품 오인</button><button data-t="소비자 오인">소비자 오인</button><button data-t="기능성 오인">기능성 오인</button><button data-t="범위 일탈">범위 일탈</button><button data-t="비교 광고">비교 광고</button><button data-t="표시 위반">표시 위반</button>
+  </div>
+  <table>
+    <thead><tr><th>ID</th><th>시기</th><th>업체 · 품목</th><th>위반 유형</th><th>처분</th><th>공개 문구 · 참고</th></tr></thead>
+    <tbody id="rows">
+    {% for c in cases|reverse %}
+      <tr data-types="{{ c.types|join(',') }}">
+        <td>{{ c.id }}</td>
+        <td class="m">{{ c.date }}</td>
+        <td><b>{{ c.company }}</b><br>{{ c.product }}{% if c.channel %}<br><span class="hint">{{ c.channel }}</span>{% endif %}</td>
+        <td>{% for t in c.types %}<span class="t {{ t.split(' ')[0] }}">{{ t }}</span>{% endfor %}</td>
+        <td class="m">{{ c.penalty }}</td>
+        <td>{% if c.phrase %}<span class="ph">{{ c.phrase }}</span><br>{% endif %}{% if c.hint %}<span class="hint">{{ c.hint }}</span><br>{% endif %}<a class="hint" href="{{ c.source }}" target="_blank" rel="noopener">출처</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">출처: 코스인코리아·메디팜헬스뉴스 등의 식약처 행정처분 정리 기사(2025.9~2026.8 중심, 문구가 공개된 이전 사례 일부 포함). '참고' 메모는 제품명에서 읽히는 문제 소지를 정리한 것으로 식약처 공식 사유가 아닙니다.</p>
+</div>
+<script>
+  const q=document.getElementById('q'), rows=[...document.querySelectorAll('#rows tr')]; let t='';
+  function apply(){ const k=q.value.trim().toLowerCase(); rows.forEach(r=>{ const okT=!t||r.dataset.types.includes(t); const okQ=!k||r.innerText.toLowerCase().includes(k); r.style.display=(okT&&okQ)?'':'none'; }); }
+  q.addEventListener('input',apply);
+  document.querySelectorAll('.bar button').forEach(b=>b.onclick=()=>{ t=b.dataset.t; document.querySelectorAll('.bar button').forEach(x=>x.classList.toggle('on',x===b)); apply(); });
+</script>
+</body>
+</html>

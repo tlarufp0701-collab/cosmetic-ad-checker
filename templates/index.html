@@ -93,6 +93,14 @@
   .row{font-size:13.5px;margin-top:6px;display:flex;gap:8px}
   .row .k{flex:none;width:64px;color:var(--sub);font-weight:500}
   .row .v{flex:1;word-break:keep-all}
+  .pen{margin:2px 0 10px;background:#fdf3f3;border:1px solid #f6d5d5;border-radius:10px;padding:9px 12px;font-size:13.5px;color:#7a1f1f}
+  .pen b{color:#c0392b}
+  .cases{margin-top:8px;background:#f7f6f2;border-radius:9px;padding:9px 12px;font-size:12.8px}
+  .cases .ct{font-weight:700;color:#555;font-size:11.5px;margin-bottom:4px}
+  .cases .ci{margin:3px 0;line-height:1.5}
+  .cases .ci a{color:#2d5486;text-decoration:none;margin-left:4px}
+  .cases .ph{color:#9b1c1c}
+  .row .v.pv{font-weight:700;color:#c0392b}
   .fix{margin-top:10px;background:var(--ok-bg);border-radius:9px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
   .fix .v{flex:1;font-size:14px;font-weight:500;color:#1f5e3c;word-break:keep-all}
   .fix .k{font-size:11.5px;font-weight:700;color:var(--ok);flex:none;margin-top:2px}
@@ -173,6 +181,7 @@
       <div class="sum-body">
         <div class="prod" id="prod"></div>
         <p id="summary"></p>
+        <div class="pen" id="pen" style="display:none"></div>
         <div class="counts" id="counts"></div>
       </div>
     </div>
@@ -197,7 +206,7 @@
   </div>
 
   <div class="notice">
-    <b>검토 기준</b> · 화장품법 제13조(부당한 표시·광고 금지), 시행규칙 별표5, 화장품 표시·광고 실증에 관한 규정, 식약처 「화장품 표시·광고 관리 지침」(2025.1 개정: 의약전문가 추천·병원용, 엑소좀 등 인체유래, 마이크로니들, 피부나이 n세 감소 금지 등), 메타 광고 정책 일부.<br>
+    <b>검토 기준</b> · <a href="/cases" style="color:#2d5486">식약처 행정처분 사례집</a>, 화장품법 제13조(부당한 표시·광고 금지), 시행규칙 별표5, 화장품 표시·광고 실증에 관한 규정, 식약처 「화장품 표시·광고 관리 지침」(2025.1 개정: 의약전문가 추천·병원용, 엑소좀 등 인체유래, 마이크로니들, 피부나이 n세 감소 금지 등), 메타 광고 정책 일부.<br>
     <b>참고용입니다.</b> 첫 접속 시 서버가 깨어나는 데 1분 정도 걸릴 수 있어요. AI 검토 결과로 법적 판단을 대신할 수 없으며, 집행 전 최종 확인은 대한화장품협회 광고자문 또는 식약처 기준을 참고하세요.
   </div>
 </div>
@@ -385,6 +394,7 @@
   }
 
   const RANK = {'높음':3,'중간':2,'낮음':1,'안전':0};
+  const months = s => { const m = String(s||'').match(/(\d+)\s*개월/g); return m ? Math.max(...m.map(x=>parseInt(x))) : 0; };
   function merge(rs){
     if (rs.length === 1) return normalize(rs[0]);
     const all = rs.map(normalize);
@@ -398,6 +408,7 @@
       overall,
       detected_product: all.find(r=>r.detected_product)?.detected_product || '',
       summary: all.map(r=>r.summary).filter(Boolean).join(' '),
+      penalty_summary: all.map(r=>r.penalty_summary).filter(Boolean).sort((a,b)=>months(b)-months(a))[0] || '',
       findings,
       ok_points: [...new Set(all.flatMap(r=>r.ok_points))].slice(0,4),
       checks: [...new Set(all.flatMap(r=>r.checks))].slice(0,5)
@@ -409,12 +420,14 @@
       risk: ['높음','중간','낮음'].includes(f.risk) ? f.risk : '중간',
       quote: f.quote||'', location: f.location||'', image_no: Number(f.image_no)||0,
       category: f.category||'', basis: f.basis||'', reason: f.reason||'',
-      suggestion: f.suggestion||'', evidence_needed: f.evidence_needed||''
+      suggestion: f.suggestion||'', evidence_needed: f.evidence_needed||'',
+      expected_penalty: f.expected_penalty||'',
+      similar_cases: (Array.isArray(f.similar_cases)?f.similar_cases:[]).filter(c => c && typeof c === 'object' && c.id)
     }));
     let overall = ['높음','중간','낮음','안전'].includes(r.overall) ? r.overall : null;
     const top = findings.reduce((m,f)=>Math.max(m,RANK[f.risk]),0);
     if (!overall || RANK[overall] < top) overall = ['안전','낮음','중간','높음'][top];
-    return { overall, detected_product: r.detected_product||'', summary: r.summary||'', findings,
+    return { overall, detected_product: r.detected_product||'', summary: r.summary||'', penalty_summary: r.penalty_summary||'', findings,
       ok_points: Array.isArray(r.ok_points)?r.ok_points:[], checks: Array.isArray(r.checks)?r.checks:[] };
   }
 
@@ -425,6 +438,8 @@
     const g = $("#grade"); g.className = 'grade g-'+r.overall; g.innerHTML = `<b>${esc(r.overall)}</b><small>종합 위험도</small>`;
     $("#prod").textContent = r.detected_product ? '인식한 제품 · ' + r.detected_product : '';
     $("#summary").textContent = r.summary || (r.findings.length ? '' : '오인 소지가 있는 표현을 찾지 못했어요.');
+    const pen = $("#pen");
+    if (r.penalty_summary && r.findings.length){ pen.style.display='block'; pen.innerHTML = `⚖️ <b>적발 시 예상 처분</b> · ${esc(r.penalty_summary)}`; } else pen.style.display='none';
     const c = {'높음':0,'중간':0,'낮음':0}; r.findings.forEach(f=>c[f.risk]++);
     $("#counts").innerHTML = Object.entries(c).map(([k,v])=>`<span class="pill p-${k}">${k} ${v}건</span>`).join('');
     filter = '전체';
@@ -458,6 +473,8 @@
         ${f.reason?`<div class="row"><span class="k">문제점</span><span class="v">${esc(f.reason)}</span></div>`:''}
         ${f.basis?`<div class="row"><span class="k">근거</span><span class="v">${esc(f.basis)}</span></div>`:''}
         ${f.evidence_needed?`<div class="row"><span class="k">필요자료</span><span class="v">${esc(f.evidence_needed)}</span></div>`:''}
+        ${f.expected_penalty?`<div class="row"><span class="k">예상 처분</span><span class="v pv">${esc(f.expected_penalty)}</span></div>`:''}
+        ${f.similar_cases.length?`<div class="cases"><div class="ct">비슷한 실제 처분 사례</div>${f.similar_cases.map(c=>`<div class="ci">· ${esc(c.date)} ${esc(c.company)} '${esc(c.product)}' — ${esc((c.types||[]).join(', '))} → <b>${esc(c.penalty)}</b>${c.phrase?` <span class="ph">${esc(c.phrase)}</span>`:''}<a href="${esc(c.source)}" target="_blank" rel="noopener">출처</a></div>`).join('')}</div>`:''}
         ${f.suggestion?`<div class="fix"><span class="k">수정안</span><span class="v">${esc(f.suggestion)}</span><button class="btn btn-sm" data-copy="${i}">복사</button></div>`:''}
       </div>`).join('');
     box.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copyText(list[+b.dataset.copy].suggestion));
@@ -473,6 +490,7 @@
     if (r.detected_product) lines.push(`제품: ${r.detected_product}`);
     lines.push(`종합 위험도: ${r.overall}`);
     if (r.summary) lines.push(`요약: ${r.summary}`);
+    if (r.penalty_summary && r.findings.length) lines.push(`적발 시 예상 처분: ${r.penalty_summary}`);
     lines.push('');
     r.findings.forEach((f,i) => {
       lines.push(`${i+1}. [${f.risk}] "${f.quote}"${f.location?` (${f.location})`:''}`);
@@ -480,10 +498,12 @@
       if (f.reason) lines.push(`   - 문제점: ${f.reason}`);
       if (f.basis) lines.push(`   - 근거: ${f.basis}`);
       if (f.evidence_needed) lines.push(`   - 필요자료: ${f.evidence_needed}`);
+      if (f.expected_penalty) lines.push(`   - 예상 처분: ${f.expected_penalty}`);
+      f.similar_cases.forEach(c => lines.push(`   - 유사 사례: ${c.date} ${c.company} '${c.product}' (${(c.types||[]).join(', ')}) → ${c.penalty}`));
       if (f.suggestion) lines.push(`   - 수정안: ${f.suggestion}`);
     });
     if (r.checks.length){ lines.push(''); lines.push('추가 확인 사항'); r.checks.forEach(c=>lines.push(`- ${c}`)); }
-    lines.push(''); lines.push('※ AI 참고 검토이며 최종 판단은 식약처 기준·대한화장품협회 광고자문을 따름');
+    lines.push(''); lines.push('※ AI 참고 검토이며 예상 처분은 최근 처분 사례 기준 추정치. 최종 판단은 식약처 기준·대한화장품협회 광고자문을 따름');
     return lines.join('\n');
   }
   $("#copyReport").onclick = () => lastResult && copyText(reportText(lastResult));

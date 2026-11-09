@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, render_template, request
 
 from src.analyzer import analyze
+from src.cases import CASES, case_brief
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 요청 1건 최대 25MB
@@ -33,6 +34,22 @@ def _rate_limited(ip: str) -> bool:
     return False
 
 
+def _attach_cases(result: dict) -> dict:
+    """AI가 고른 사례 id를 사례집의 실제 내용으로 바꿔 붙인다 (AI가 사례 내용을 지어내지 않도록)."""
+    for f in result.get("findings") or []:
+        ids = f.get("similar_cases") or []
+        if not isinstance(ids, list):
+            ids = [ids]
+        briefs = [b for b in (case_brief(i) for i in ids[:5]) if b][:2]
+        f["similar_cases"] = briefs
+    return result
+
+
+@app.route("/cases")
+def cases_page():
+    return render_template("cases.html", cases=CASES)
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -57,7 +74,7 @@ def api_analyze():
         return jsonify({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."}), 429
 
     try:
-        return jsonify(analyze(data))
+        return jsonify(_attach_cases(analyze(data)))
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 400
     except Exception:  # noqa: BLE001
