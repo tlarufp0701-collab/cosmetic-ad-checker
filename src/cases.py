@@ -27,6 +27,11 @@ S = {
     "c54742": "https://cosinkorea.com/mobile/article.html?no=54742",
     "c54298": "https://cosinkorea.com/mobile/article.html?no=54298",
     "kuki2014": "https://www.kukinews.com/article/view/kuk201406240212",
+    "c57266": "https://www.cosinkorea.com/mobile/article.html?no=57266",
+    "c57356b": "https://www.cosinkorea.com/mobile/article.html?no=57356",
+    "c51642": "https://www.cosinkorea.com/mobile/article.html?no=51642",
+    "medigate2020": "https://medigatenews.com/news/2416843161",
+    "newsis2025": "https://mobile.newsis.com/view/NISX20250827_0003304689",
 }
 
 
@@ -110,10 +115,25 @@ CASES = [
     _c("C64", "2025-01", "인텐더", "튼셀크림", ["기능성 오인"], "광고업무정지 3개월", 3, "c54298", channel="인터넷 사이트", hint="튼살(기능성 심사·보고 없이)"),
     _c("C65", "2025-03-24", "킥더허들", "셀인샷 보툴샷 100·300·700", ["범위 일탈"], "광고업무정지 2개월", 2, "c54742", hint="보툴(보톡스 연상)"),
     _c("C66", "2025-02-26", "순녹", "바이브랩스칼프스피옥실리액트샷800", ["비교 광고"], "광고업무정지 2개월", 2, "c54742", channel="인터넷 사이트", hint="비교 대상과 기준을 밝히지 않은 광고"),
+    _c("C68", "2026-01-08", "가람포리아", "자색당근세럼(마케팅명: 기미도감 자색당근세럼)", ["의약품 오인", "소비자 오인"], "광고업무정지 4개월", 4, "c56838", hint="기미(미백 기능성 연상)"),
+    _c("C69", "2026-01-22", "유나이티드페밀리오피스", "0720케어타임뽕잎퓨어자몽샴푸", ["부당 광고"], "광고업무정지 2개월", 2, "c56838"),
+    _c("C70", "2026-03", "갯뉴스킨코리아", "지니움 콜라겐 글루타치온 라인 4종", ["소비자 오인"], "광고업무정지 4개월", 4, "c57266", hint="콜라겐·글루타치온(미백·탄력 과장)"),
+    _c("C71", "2026-03", "아나시스", "벨라쉐이프 액티브 크림 외 1종", ["의약품 오인"], "광고업무정지 3개월", 3, "c57266", hint="쉐이프(체형·지방 감소 연상)"),
+    _c("C72", "2026-04-14", "무궁지", "레이지래빗 부스트샷 크림", ["부당 광고"], "광고업무정지 2개월", 2, "c57356b", hint="샷"),
+    _c("C73", "2026-05-04", "한국비엔씨", "아이스트 디디에 휘 헴프스템 앰플 스틱", ["소비자 오인"], "광고업무정지 2개월", 2, "c57557", hint="과대광고 / 스템(줄기세포 연상)"),
+    _c("C74", "2026-05", "(5월 처분 업체)", "더마쉐어시카비타민앰플밤", ["부당 광고"], "광고업무정지 6개월(2차 위반)", 6, "c57557", hint="2차 위반 가중"),
+    _c("C75", "2024-04-15", "노익스", "오모로비짜 컴플렉션 퍼펙터 SPF20 BB크림", ["기능성 오인"], "광고업무정지 3개월", 3, "c51642", channel="네이버 스마트스토어", phrase="\"SPF20\"", hint="자외선 차단 기능성 미심사"),
+    _c("C76", "2024-04-11", "네오팜", "아토팜 엠엘이 크림 스틱밤", ["기능성 오인"], "광고업무정지 3개월", 3, "c51642", hint="아토피 연상"),
+    _c("C77", "2024-04-17", "바이오인터체인지", "리휴 마두카 탈모샴푸", ["의약품 오인"], "광고업무정지 3개월", 3, "c51642", hint="탈모"),
+    _c("C78", "2020-07", "식약처 기획점검(23개 업체 행정처분 의뢰)", "특정 피부질환 표방 화장품 온라인 광고 246건", ["의약품 오인"], "사이트 접속차단 + 책임판매업체 현장점검·행정처분", 3, "medigate2020", phrase="\"습진·가려움 완화\", \"여드름·피부염·무좀 등에 효과\", \"피부재생\", \"항균작용\", \"상처·염증 치료\"", hint="무좀·습진 등 질환명, 항균작용 표방 (크림·스프레이·데오드란트 다수)"),
     _c("C67", "2014-06", "케이비퍼시픽", "악마크림 1탄 유럽더넘버7", ["절대적 표현"], "광고업무정지 2개월", 2, "kuki2014", channel="인터넷", phrase="\"지상 최고의 보습력\", \"최고의 보습시간\", \"최강의 보습\""),
 ]
 
 CASES_BY_ID = {c["id"]: c for c in CASES}
+
+
+def _undisclosed(c: dict) -> bool:
+    return c["product"].startswith("(") or c["company"].startswith("(")
 
 PENALTY_GUIDE = """[처분 수준 기준 — 위 사례집에서 확인되는 1차 위반 기준 패턴]
 - 처분은 '품목' 단위다. 상세페이지·SNS 등 광고 위반은 '해당 품목 광고업무정지', 용기·포장 표시 위반은 '해당 품목 판매업무정지'.
@@ -128,6 +148,8 @@ PENALTY_GUIDE = """[처분 수준 기준 — 위 사례집에서 확인되는 1�
 def cases_for_prompt() -> str:
     lines = ["[최근 식약처 행정처분 사례집 — id | 시기 | 업체 | 품목 | 위반 유형 | 처분 | 공개 문구·참고]"]
     for c in CASES:
+        if _undisclosed(c):
+            continue  # 품목명 미공개 사례는 처분 기준에만 반영하고 유사 사례 후보에서는 뺀다
         extra = c["phrase"] or c["hint"]
         lines.append(
             f"{c['id']} | {c['date']} | {c['company']} | {c['product']} | {', '.join(c['types'])} | {c['penalty']}"
@@ -141,3 +163,51 @@ def case_brief(case_id: str) -> dict | None:
     if not c:
         return None
     return {k: c[k] for k in ("id", "date", "company", "product", "types", "penalty", "phrase", "source")}
+
+
+# ---- AI가 유사 사례를 고르지 못했을 때 쓰는 키워드·유형 매칭 ----
+_CATEGORY_TO_TYPE = {
+    "의약품 오인": "의약품 오인", "기능성 오인": "기능성 오인", "천연·유기농 오인": "천연·유기농 오인",
+    "의료인·기관 추천": "전문가 추천", "절대적·배타적 표현": "절대적 표현", "비교·비방": "비교 광고",
+    "소비자 오인": "소비자 오인", "수치·시험결과 표기": "소비자 오인", "실증 필요": "소비자 오인",
+    "무첨가·Free 표현": "소비자 오인", "특허·인증 표현": "소비자 오인",
+}
+_CONCEPTS = [
+    ["무좀", "곰팡이", "진균", "습진", "피부염", "지루성", "아토", "질환", "가려움", "칼라민"],
+    ["균", "항균", "살균", "소독", "세균"],
+    ["재생", "리페어", "피디알엔", "PDRN", "회복", "손상", "프로시져"],
+    ["엑소좀", "줄기세포", "스템"],
+    ["리프팅", "브이", "윤곽", "탄력"],
+    ["화이트닝", "미백", "기미", "트라넥스", "브라이트닝", "톤업", "글루타치온"],
+    ["샷", "니들", "스피큘", "침투", "보툴", "보톡스", "필러", "시술", "패치"],
+    ["전문의", "의사가", "의사 ", "약사", "병원", "추천", "전문가"],
+    ["최고", "최강", "최상", "1위", "No.1", "넘버"],
+    ["비교", "타사", "경쟁"],
+    ["여드름", "트러블", "레드니스", "홍조"],
+    ["탈모", "두피", "발모"],
+    ["슬리밍", "리듀싱", "쉐이프", "지방", "셀룰라이트", "다이어트"],
+    ["스트레스", "심신", "마인드", "피로", "관절", "근육", "리커버리"],
+    ["페미닌", "질염", "질쎄라", "Y존", "여성 청결"],
+    ["침독", "발진", "벌레", "바이트"],
+    ["SPF", "자외선"],
+    ["튼살", "주름"],
+]
+
+
+def fallback_cases(finding: dict, limit: int = 2) -> list[dict]:
+    text = " ".join(str(finding.get(k, "")) for k in ("quote", "reason", "category")).lower()
+    want_type = _CATEGORY_TO_TYPE.get(str(finding.get("category", "")).strip())
+    hit_concepts = [grp for grp in _CONCEPTS if any(w.lower() in text for w in grp)]
+    scored = []
+    for c in CASES:
+        if _undisclosed(c):
+            continue
+        hay = f"{c['product']} {c['hint']} {c['phrase']}".lower()
+        concept = sum(1 for grp in hit_concepts if any(w.lower() in hay for w in grp))
+        type_ok = want_type in c["types"] if want_type else False
+        score = concept * 4 + (2 if type_ok else 0) + (1 if type_ok and len(c["types"]) == 1 else 0)
+        if concept == 0 and not type_ok:
+            continue
+        scored.append((score, c["date"], c))
+    scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return [case_brief(c["id"]) for score, _, c in scored[:limit] if score >= 2]

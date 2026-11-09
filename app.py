@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 from flask import Flask, jsonify, render_template, request
 
 from src.analyzer import analyze
-from src.cases import CASES, case_brief
+from src.cases import CASES, case_brief, fallback_cases
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 요청 1건 최대 25MB
@@ -40,7 +40,9 @@ def _attach_cases(result: dict) -> dict:
         ids = f.get("similar_cases") or []
         if not isinstance(ids, list):
             ids = [ids]
-        briefs = [b for b in (case_brief(i) for i in ids[:5]) if b and not b["product"].startswith("(")][:2]
+        briefs = [b for b in (case_brief(i) for i in ids[:5]) if b and not b["product"].startswith("(") and not b["company"].startswith("(")][:2]
+        if not briefs and f.get("category") != "플랫폼 정책":
+            briefs = fallback_cases(f)
         f["similar_cases"] = briefs
     return result
 
