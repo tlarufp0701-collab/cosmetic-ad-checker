@@ -41,8 +41,9 @@ def _attach_cases(result: dict) -> dict:
         if not isinstance(ids, list):
             ids = [ids]
         briefs = [b for b in (case_brief(i) for i in ids[:5]) if b and not b["product"].startswith("(") and not b["company"].startswith("(")][:2]
-        if not briefs and f.get("category") != "플랫폼 정책":
-            briefs = fallback_cases(f)
+        if len(briefs) < 2 and f.get("category") != "플랫폼 정책":
+            have = {b["id"] for b in briefs}
+            briefs += [b for b in fallback_cases(f, limit=3) if b["id"] not in have][: 2 - len(briefs)]
         f["similar_cases"] = briefs
     return result
 
