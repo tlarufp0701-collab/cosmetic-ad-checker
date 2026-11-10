@@ -477,7 +477,7 @@
     return {
       overall,
       detected_product: all.find(r=>r.detected_product)?.detected_product || '',
-      summary: all.map(r=>r.summary).filter(Boolean).join(' '),
+      summary: (all.filter(r=>r.summary).sort((a,b)=>(RANK[b.overall]-RANK[a.overall]) || (b.findings.length-a.findings.length))[0] || {}).summary || '',
       penalty_summary: all.map(r=>r.penalty_summary).filter(Boolean).sort((a,b)=>months(b)-months(a))[0] || '',
       findings,
       ok_points: [...new Set(all.flatMap(r=>r.ok_points))].slice(0,4),
