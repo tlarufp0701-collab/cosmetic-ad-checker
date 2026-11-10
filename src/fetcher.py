@@ -147,7 +147,7 @@ def _parse_page(html: bytes, base: str):
     return _clean_text(title)[:150], _clean_text(desc)[:300], detail_text, ordered[:MAX_CANDIDATES], in_detail
 
 
-def _open_image(data: bytes) -> Image.Image | None:
+def _open_image_unused(data: bytes) -> Image.Image | None:
     try:
         im = Image.open(io.BytesIO(data))
         im.seek(0)
@@ -161,18 +161,51 @@ def _open_image(data: bytes) -> Image.Image | None:
         return None
 
 
-def _download_images(urls: list[str], referer: str) -> list[Image.Image | None]:
+def _download_bytes(urls: list[str], referer: str) -> list[bytes | None]:
+    """이미지 파일을 바이트로만 받아온다 (메모리 절약: 디코딩은 나중에 한 장씩)."""
     def one(u):
         try:
             data, ctype, _ = _get(u, IMG_LIMIT, timeout=15, referer=referer)
             if ctype and not ctype.startswith("image/") and "octet-stream" not in ctype:
                 return None
-            return _open_image(data)
+            return data
         except Exception:  # noqa: BLE001
             return None
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         return list(ex.map(one, urls))
+
+
+def _peek_size(data: bytes):
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            return im.size
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _decode_scaled(data: bytes) -> Image.Image | None:
+    """가로 MAX_W 기준으로 줄여서 디코딩한다. JPEG는 draft로 처음부터 작게 읽어 메모리를 아낀다."""
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.seek(0)
+        if im.format == "JPEG" and im.width >= 1600:
+            # draft는 1/2·1/4 단위로만 줄인다. 가로 800px 이상은 남도록 요청
+            im.draft("RGB", (800, round(im.height * 800 / im.width)))
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            bg.paste(im, mask=im.split()[-1])
+            im = bg
+        elif im.mode != "RGB":
+            im = im.convert("RGB")
+        else:
+            im.load()
+        if im.width > MAX_W:
+            im = im.resize((MAX_W, round(im.height * MAX_W / im.width)), Image.LANCZOS)
+        return im
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _slice(im: Image.Image) -> list[Image.Image]:
@@ -218,8 +251,38 @@ def prepare_from_urls(urls: list[str]) -> dict:
         raise FetchError("링크를 넣어주세요.")
     _cleanup_cache()
 
-    images: list[Image.Image] = []
+    token = uuid.uuid4().hex
+    folder = os.path.join(CACHE_DIR, token)
+    os.makedirs(folder, exist_ok=True)
+    state = {"idx": 0, "src": 0, "truncated": False}
+    slices: list[dict] = []
     titles, texts, notes = [], [], []
+
+    def add_image(data: bytes) -> bool:
+        """이미지 한 장을 디코딩→자르기→저장하고 바로 메모리에서 내린다."""
+        if state["idx"] >= MAX_SLICES:
+            state["truncated"] = True
+            return False
+        im = _decode_scaled(data)
+        if im is None:
+            return False
+        state["src"] += 1
+        parts = _slice(im)
+        for p_no, part in enumerate(parts, start=1):
+            if state["idx"] >= MAX_SLICES:
+                state["truncated"] = True
+                break
+            i = state["idx"]
+            part.save(os.path.join(folder, f"{i:03d}.jpg"), "JPEG", quality=80, optimize=True)
+            slices.append({
+                "i": i, "src": state["src"],
+                "part": f"{p_no}/{len(parts)}구간" if len(parts) > 1 else "",
+                "thumb": _thumb(part),
+            })
+            state["idx"] += 1
+        del im, parts
+        return True
+
     for url in urls:
         if not re.match(r"^https?://", url, re.I):
             url = "https://" + url
@@ -235,12 +298,11 @@ def prepare_from_urls(urls: list[str]) -> dict:
             continue
 
         if ctype.startswith("image/"):
-            im = _open_image(data)
-            if im:
-                images.append(im)
+            add_image(data)
             continue
 
         title, desc, detail_text, cand, in_detail = _parse_page(data, final)
+        del data
         if title:
             titles.append(title)
         if detail_text:
@@ -249,47 +311,35 @@ def prepare_from_urls(urls: list[str]) -> dict:
             texts.append(desc)
         min_w = 400 if in_detail else 600
         got = 0
-        for im in _download_images(cand, final):
-            if im is None or im.width < min_w or im.height < 200:
+        blobs = _download_bytes(cand, final)
+        for k, b in enumerate(blobs):
+            blobs[k] = None
+            if not b:
                 continue
-            images.append(im)
-            got += 1
-        if not got:
+            size = _peek_size(b)
+            if not size or size[0] < min_w or size[1] < 200:
+                continue
+            if add_image(b):
+                got += 1
+            if state["truncated"]:
+                break
+        del blobs
+        if not got and not state["truncated"]:
             notes.append(f"{host}: 상세 이미지를 찾지 못했어요. {hint}".strip())
 
-    if not images:
+    if not slices:
+        shutil.rmtree(folder, ignore_errors=True)
         raise FetchError(" / ".join(notes) or "가져올 수 있는 이미지가 없어요.")
 
-    token = uuid.uuid4().hex
-    folder = os.path.join(CACHE_DIR, token)
-    os.makedirs(folder, exist_ok=True)
-    slices, idx = [], 0
-    truncated = False
-    for src_no, im in enumerate(images, start=1):
-        parts = _slice(im)
-        for p_no, part in enumerate(parts, start=1):
-            if idx >= MAX_SLICES:
-                truncated = True
-                break
-            part.save(os.path.join(folder, f"{idx:03d}.jpg"), "JPEG", quality=80, optimize=True)
-            slices.append({
-                "i": idx, "src": src_no,
-                "part": f"{p_no}/{len(parts)}구간" if len(parts) > 1 else "",
-                "thumb": _thumb(part),
-            })
-            idx += 1
-        if truncated:
-            break
     with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
-        json.dump({"count": idx, "created": time.time()}, f)
-
-    if truncated:
+        json.dump({"count": state["idx"], "created": time.time()}, f)
+    if state["truncated"]:
         notes.append(f"이미지가 많아서 앞쪽 {MAX_SLICES}구간까지만 가져왔어요.")
     return {
         "token": token,
         "title": titles[0] if titles else "",
         "page_text": " / ".join(texts)[:2500],
-        "source_count": len(images),
+        "source_count": state["src"],
         "slices": slices,
         "notes": notes,
     }

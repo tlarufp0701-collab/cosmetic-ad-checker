@@ -11,4 +11,4 @@ ENV PORT=8000
 EXPOSE 8000
 
 # 이미지 여러 장 분석 + 재시도까지 감안해 타임아웃을 넉넉히 잡습니다.
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --timeout 240 --workers 2 --threads 4
+CMD gunicorn app:app --bind 0.0.0.0:$PORT --timeout 240 --workers 1 --threads 8
