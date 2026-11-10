@@ -36,6 +36,7 @@ MAX_CANDIDATES = 60
 MAX_SLICES = 48
 HTML_LIMIT = 8 * 1024 * 1024
 IMG_LIMIT = 20 * 1024 * 1024
+TEXT_LIMIT = 8000
 
 DETAIL_SELECTORS = [
     "#prdDetail", ".xans-product-detail", "#productDetail", ".product-detail", ".prd-detail",
@@ -116,9 +117,13 @@ def _parse_page(html: bytes, base: str):
     desc_tag = soup.find("meta", attrs={"name": "description"}) or soup.find("meta", attrs={"property": "og:description"})
     desc = desc_tag.get("content", "") if desc_tag else ""
 
+    # 우선순위가 가장 높은 상세 영역 하나만 쓴다 (상단 썸네일·추천상품·리뷰 영역 제외)
     roots = []
     for sel in DETAIL_SELECTORS:
-        roots.extend(soup.select(sel))
+        found = [el for el in soup.select(sel) if el.find("img") or len(el.get_text(strip=True)) > 200]
+        if found:
+            roots = found
+            break
     in_detail = bool(roots)
 
     def collect(nodes):
@@ -143,7 +148,7 @@ def _parse_page(html: bytes, base: str):
             seen.add(u)
             ordered.append(u)
 
-    detail_text = _clean_text(" ".join(r.get_text(" ") for r in roots))[:2500] if roots else ""
+    detail_text = _clean_text(" ".join(r.get_text(" ") for r in roots))[:TEXT_LIMIT] if roots else ""
     return _clean_text(title)[:150], _clean_text(desc)[:300], detail_text, ordered[:MAX_CANDIDATES], in_detail
 
 
@@ -309,7 +314,7 @@ def prepare_from_urls(urls: list[str]) -> dict:
             texts.append(detail_text)
         elif desc:
             texts.append(desc)
-        min_w = 400 if in_detail else 600
+        min_w = 250 if in_detail else 600
         got = 0
         blobs = _download_bytes(cand, final)
         for k, b in enumerate(blobs):
@@ -324,12 +329,12 @@ def prepare_from_urls(urls: list[str]) -> dict:
             if state["truncated"]:
                 break
         del blobs
-        if not got and not state["truncated"]:
+        if not got and not state["truncated"] and not detail_text:
             notes.append(f"{host}: 상세 이미지를 찾지 못했어요. {hint}".strip())
 
-    if not slices:
+    if not slices and not texts:
         shutil.rmtree(folder, ignore_errors=True)
-        raise FetchError(" / ".join(notes) or "가져올 수 있는 이미지가 없어요.")
+        raise FetchError(" / ".join(notes) or "가져올 수 있는 이미지나 글자가 없어요.")
 
     with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as f:
         json.dump({"count": state["idx"], "created": time.time()}, f)
@@ -338,7 +343,7 @@ def prepare_from_urls(urls: list[str]) -> dict:
     return {
         "token": token,
         "title": titles[0] if titles else "",
-        "page_text": " / ".join(texts)[:2500],
+        "page_text": " / ".join(texts)[:TEXT_LIMIT],
         "source_count": state["src"],
         "slices": slices,
         "notes": notes,

@@ -292,7 +292,7 @@
       if (data.title && !$("#pname").value.trim()) $("#pname").value = data.title;
       if (!document.querySelector('input[name=kind]:checked') || document.getElementById('k1').checked) document.getElementById('k2').checked = true;
       renderThumbs();
-      toast(`이미지 ${data.source_count}장(${data.slices.length}구간)을 가져왔어요`);
+      toast(data.slices.length ? `이미지 ${data.source_count}장${data.page_text ? '과 본문 글자' : ''}을 가져왔어요` : '본문 글자를 가져왔어요');
       if (data.notes && data.notes.length) showErr('참고: ' + data.notes.join(' / '));
     }catch(e){
       showErr(e.message || String(e));
@@ -378,7 +378,9 @@
       box.appendChild(d);
     });
     const srcs = new Set(slices.map(s=>s.src)).size;
-    $("#imgMeta").textContent = slices.length ? `원본 ${srcs}장 → 분석 단위 ${slices.length}개${slices.length>srcs?' (긴 이미지는 구간별로 나눔)':''}` : '';
+    const tx = pageText ? `상세페이지 본문 글자 ${pageText.length.toLocaleString()}자` : '';
+    const im = slices.length ? `이미지 원본 ${srcs}장 → 분석 단위 ${slices.length}개${slices.length>srcs?' (긴 이미지는 구간별로 나눔)':''}` : '';
+    $("#imgMeta").textContent = [tx, im].filter(Boolean).join(' + ') + (tx || im ? ' 검토 예정' : '');
   }
 
   // ---------- server call ----------
@@ -407,7 +409,7 @@
     if (preparing){ toast('이미지 준비가 끝나면 눌러 주세요'); return; }
     $("#err").style.display='none';
     const copy = $("#copy").value.trim();
-    if (!slices.length && !copy){ showErr('링크를 가져오거나, 이미지를 올리거나, 광고 문구를 붙여넣어 주세요.'); return; }
+    if (!slices.length && !copy && !pageText){ showErr('링크를 가져오거나, 이미지를 올리거나, 광고 문구를 붙여넣어 주세요.'); return; }
 
     const batches = [];
     if (!slices.length) batches.push([0,0]);
