@@ -109,6 +109,10 @@ def build_prompt(data: dict) -> str:
     else:
         lines.append("- 첨부 이미지: 없음")
 
+    page_text = _clip(data.get("page_text"), 2500)
+    if page_text and batch_idx == 1:
+        lines.append(f'- 링크 페이지에서 읽은 텍스트(상품명·설명 등, 검토 대상에 포함):\n"""\n{page_text}\n"""')
+
     if copy and batch_idx == 1:
         lines.append(f'- 붙여넣은 광고 문구:\n"""\n{copy}\n"""')
     elif copy:

@@ -53,10 +53,9 @@ def analyze(data: dict) -> dict:
     if not GEMINI_API_KEY:
         raise RuntimeError("서버에 GEMINI_API_KEY가 설정되어 있지 않습니다.")
 
-    images = data.get("images") or []
     contents = [build_prompt(data)]
-    for img in images:
-        contents.append(Part.from_bytes(data=_decode_image(img), mime_type="image/jpeg"))
+    for raw in data.get("image_bytes") or [_decode_image(img) for img in (data.get("images") or [])]:
+        contents.append(Part.from_bytes(data=raw, mime_type="image/jpeg"))
 
     client = genai.Client(api_key=GEMINI_API_KEY)
     last_error = None

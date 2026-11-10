@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import traceback
 from collections import defaultdict, deque
@@ -7,6 +8,8 @@ from flask import Flask, jsonify, render_template, request
 
 from src.analyzer import analyze
 from src.cases import CASES, case_brief, fallback_cases
+from src.fetcher import FetchError, load_slice, prepare_from_urls
+from src.analyzer import _decode_image
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 요청 1건 최대 25MB
@@ -48,6 +51,24 @@ def _attach_cases(result: dict) -> dict:
     return result
 
 
+@app.route("/api/prepare-url", methods=["POST"])
+def api_prepare_url():
+    data = request.get_json(silent=True) or {}
+    raw = str(data.get("urls") or "")
+    urls = [u.strip() for u in re.split(r"[\s,]+", raw) if u.strip()]
+    if not urls:
+        return jsonify({"error": "상세페이지 링크를 넣어주세요."}), 400
+    if _rate_limited("prep:" + _client_ip()):
+        return jsonify({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."}), 429
+    try:
+        return jsonify(prepare_from_urls(urls))
+    except FetchError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        return jsonify({"error": "링크를 가져오는 중 오류가 발생했어요. 잠시 후 다시 시도해주세요."}), 500
+
+
 @app.route("/cases")
 def cases_page():
     return render_template("cases.html", cases=CASES)
@@ -66,18 +87,29 @@ def healthz():
 @app.route("/api/analyze", methods=["POST"])
 def api_analyze():
     data = request.get_json(silent=True) or {}
-    images = data.get("images") or []
     copy = (data.get("copy") or "").strip()
+    items = data.get("items")
+    if items is None:  # 예전 방식: images = data URL 목록
+        items = [{"t": "img", "d": d} for d in (data.get("images") or [])]
 
-    if not images and not copy:
-        return jsonify({"error": "이미지를 올리거나 광고 문구를 붙여넣어 주세요."}), 400
-    if len(images) > MAX_IMAGES_PER_REQUEST:
+    if not items and not copy and not (data.get("page_text") or "").strip():
+        return jsonify({"error": "링크를 가져오거나, 이미지를 올리거나, 광고 문구를 붙여넣어 주세요."}), 400
+    if len(items) > MAX_IMAGES_PER_REQUEST:
         return jsonify({"error": f"한 번에 이미지는 {MAX_IMAGES_PER_REQUEST}개까지 보낼 수 있습니다."}), 400
     if _rate_limited(_client_ip()):
         return jsonify({"error": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."}), 429
 
     try:
+        image_bytes = []
+        for it in items:
+            if it.get("t") == "srv":
+                image_bytes.append(load_slice(it.get("k"), it.get("i")))
+            else:
+                image_bytes.append(_decode_image(it.get("d") or ""))
+        data["image_bytes"] = image_bytes
         return jsonify(_attach_cases(analyze(data)))
+    except FetchError as e:
+        return jsonify({"error": str(e)}), 400
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 400
     except Exception:  # noqa: BLE001

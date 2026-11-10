@@ -42,6 +42,15 @@
   .drop{display:block}
   .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   #file:focus-visible + .drop{outline:2px solid var(--brand2);outline-offset:2px}
+  .modes{display:flex;gap:6px;margin-bottom:12px;background:#f0efeb;padding:4px;border-radius:12px}
+  .modes button{flex:1;border:0;background:transparent;padding:9px 8px;border-radius:9px;font:inherit;font-size:13.5px;font-weight:700;color:#666;cursor:pointer}
+  .modes button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .modes small{display:block;font-weight:400;font-size:11px;color:var(--sub)}
+  .linkrow{display:flex;gap:8px;align-items:stretch}
+  .linkrow textarea{flex:1;min-height:46px}
+  .btn-fetch{padding:0 16px;background:var(--brand);color:#fff;font-size:14px;border-radius:10px;white-space:nowrap}
+  .btn-fetch:disabled{background:#9aa6b6;cursor:not-allowed}
+  .linkhint{font-size:12.5px;color:var(--sub);margin-top:7px;line-height:1.55}
   .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:12px}
   .th{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#eee;aspect-ratio:3/4}
   .th img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
@@ -133,13 +142,26 @@
       <input type="radio" name="kind" id="k4" value="기타 광고물"><label for="k4">기타</label>
     </div>
 
-    <label class="lab">이미지 업로드 <span class="hint">여러 장 가능 · 긴 상세페이지는 자동으로 나눠서 분석</span></label>
+    <label class="lab">검토할 이미지</label>
+    <div class="modes" id="modes">
+      <button type="button" data-m="link" class="on">🔗 링크로 가져오기<small>회사 PC 추천</small></button>
+      <button type="button" data-m="file">📁 파일 올리기<small>캡처·이미지 파일</small></button>
+    </div>
+    <div id="linkPanel">
+      <div class="linkrow">
+        <textarea id="urls" rows="2" placeholder="상세페이지 주소를 붙여넣으세요&#10;예) https://www.내쇼핑몰.com/product/detail.html?product_no=123"></textarea>
+        <button type="button" class="btn btn-fetch" id="fetchBtn">가져오기</button>
+      </div>
+      <div class="linkhint">자사몰(카페24·아임웹·고도몰 등) 상세페이지 주소나 이미지 주소를 넣으면 서버가 이미지를 직접 가져와요. 여러 개면 줄바꿈해서 넣으세요(최대 5개).<br>쿠팡·네이버 스마트스토어는 보안 때문에 이미지가 안 잡힐 수 있어요.</div>
+    </div>
+    <div id="filePanel" style="display:none">
     <input type="file" id="file" class="vh" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp" multiple>
     <label class="drop" id="drop" for="file">
       <strong>이미지를 끌어다 놓거나 클릭해서 선택</strong>
-      <small>JPG·PNG·WEBP · 캡처 후 Ctrl+V 붙여넣기도 됩니다</small>
+      <small>JPG·PNG·WEBP · 캡처 후 Ctrl+V 붙여넣기도 됩니다 · 긴 상세페이지는 자동으로 나눠서 분석</small>
       <span class="pick">📁 파일 선택</span>
     </label>
+    </div>
     <div class="thumbs" id="thumbs"></div>
     <div class="meta" id="imgMeta"></div>
 
@@ -207,7 +229,7 @@
 
   <div class="notice">
     <b>검토 기준</b> · <a href="/cases" style="color:#2d5486">식약처 행정처분 사례집</a>, 화장품법 제13조(부당한 표시·광고 금지), 시행규칙 별표5, 화장품 표시·광고 실증에 관한 규정, 식약처 「화장품 표시·광고 관리 지침」(2025.1 개정: 의약전문가 추천·병원용, 엑소좀 등 인체유래, 마이크로니들, 피부나이 n세 감소 금지 등), 메타 광고 정책 일부.<br>
-    <b>참고용입니다.</b> 첫 접속 시 서버가 깨어나는 데 1분 정도 걸릴 수 있어요. AI 검토 결과로 법적 판단을 대신할 수 없으며, 집행 전 최종 확인은 대한화장품협회 광고자문 또는 식약처 기준을 참고하세요.
+    <b>참고용입니다.</b> 링크로 가져온 이미지는 검토용으로 서버에 2시간 동안만 임시 보관돼요. 첫 접속 시 서버가 깨어나는 데 1분 정도 걸릴 수 있어요. AI 검토 결과로 법적 판단을 대신할 수 없으며, 집행 전 최종 확인은 대한화장품협회 광고자문 또는 식약처 기준을 참고하세요.
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -234,6 +256,52 @@
       const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
       try{ document.execCommand('copy'); toast('복사했어요'); }catch(_){ toast('복사가 막혀 있어요. 직접 선택해 주세요'); }
       ta.remove();
+    }
+  }
+
+  // ---------- mode tabs ----------
+  let pageText = '';
+  document.querySelectorAll('#modes button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x === b));
+    $("#linkPanel").style.display = b.dataset.m === 'link' ? 'block' : 'none';
+    $("#filePanel").style.display = b.dataset.m === 'file' ? 'block' : 'none';
+  });
+
+  // ---------- link intake ----------
+  $("#fetchBtn").addEventListener('click', fetchLinks);
+  $("#urls").addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) fetchLinks(); });
+  async function fetchLinks(){
+    const raw = $("#urls").value.trim();
+    if (!raw){ showErr('상세페이지 링크를 넣어주세요.'); return; }
+    $("#err").style.display = 'none';
+    preparing++;
+    $("#fetchBtn").disabled = true; $("#fetchBtn").textContent = '가져오는 중…';
+    $("#run").disabled = true; $("#run").textContent = '이미지 준비 중…';
+    const t0 = Date.now();
+    const timer = setInterval(() => { $("#status").textContent = `페이지에서 상세 이미지를 가져오는 중… ${Math.floor((Date.now()-t0)/1000)}초 (처음 접속이면 1분 정도 걸릴 수 있어요)`; }, 500);
+    try{
+      let resp, data = null;
+      try { resp = await fetch('/api/prepare-url', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ urls: raw }) }); }
+      catch(e){ throw new Error('서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+      try { data = await resp.json(); } catch(_){}
+      if (!resp.ok || !data || data.error) throw new Error((data && data.error) || `서버 오류(${resp.status})`);
+      const base = srcCount;
+      data.slices.forEach(s => slices.push({ srv: { k: data.token, i: s.i }, url: s.thumb, src: base + s.src, part: s.part, name: '링크' }));
+      srcCount += data.source_count;
+      if (data.page_text) pageText = (pageText ? pageText + ' / ' : '') + data.page_text;
+      if (data.title && !$("#pname").value.trim()) $("#pname").value = data.title;
+      if (!document.querySelector('input[name=kind]:checked') || document.getElementById('k1').checked) document.getElementById('k2').checked = true;
+      renderThumbs();
+      toast(`이미지 ${data.source_count}장(${data.slices.length}구간)을 가져왔어요`);
+      if (data.notes && data.notes.length) showErr('참고: ' + data.notes.join(' / '));
+    }catch(e){
+      showErr(e.message || String(e));
+    }finally{
+      clearInterval(timer);
+      $("#status").textContent = '';
+      $("#fetchBtn").disabled = false; $("#fetchBtn").textContent = '가져오기';
+      preparing--;
+      if (!preparing && !busy){ $("#run").disabled = false; $("#run").textContent = '리스크 검토 시작'; }
     }
   }
 
@@ -339,7 +407,7 @@
     if (preparing){ toast('이미지 준비가 끝나면 눌러 주세요'); return; }
     $("#err").style.display='none';
     const copy = $("#copy").value.trim();
-    if (!slices.length && !copy){ showErr('이미지를 올리거나 광고 문구를 붙여넣어 주세요.'); return; }
+    if (!slices.length && !copy){ showErr('링크를 가져오거나, 이미지를 올리거나, 광고 문구를 붙여넣어 주세요.'); return; }
 
     const batches = [];
     if (!slices.length) batches.push([0,0]);
@@ -349,7 +417,7 @@
       kind: document.querySelector('input[name=kind]:checked').value,
       ptype: document.querySelector('input[name=ptype]:checked').value,
       func: $("#func").value.trim(), pname: $("#pname").value.trim(), evid: $("#evid").value.trim(),
-      copy, total_imgs: slices.length, batch_total: batches.length
+      copy, page_text: pageText, total_imgs: slices.length, batch_total: batches.length
     };
 
     busy = true; $("#run").disabled = true; $("#run").textContent = '검토 중…';
@@ -363,7 +431,7 @@
         const picked = slices.slice(start, start+cnt);
         const payload = Object.assign({}, base, {
           batch_idx: bi+1,
-          images: await Promise.all(picked.map(s => toDataURL(s.blob))),
+          items: await Promise.all(picked.map(async s => s.srv ? { t:'srv', k:s.srv.k, i:s.srv.i } : { t:'img', d: await toDataURL(s.blob) })),
           labels: picked.map((s,i) => `"이미지 ${start+i+1}"` + (s.part ? ` (원본 ${s.src}번 ${s.part})` : ''))
         });
         const t0 = Date.now();
